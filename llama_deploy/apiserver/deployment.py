@@ -331,8 +331,7 @@ class Deployment:
         try:
             subprocess.check_call(
                 [
-                    sys.executable,
-                    "-m",
+                    "uv",
                     "pip",
                     "install",
                     *service_config.python_dependencies,

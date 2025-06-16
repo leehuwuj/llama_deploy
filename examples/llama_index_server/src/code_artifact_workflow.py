@@ -15,14 +15,11 @@ from llama_index.core.workflow import (
 from llama_index.llms.openai import OpenAI
 
 # Just use the imports from llama_index_server for now
-from llama_index.server.api.utils import get_last_artifact  # type: ignore
 from llama_index.server.models import (  # type: ignore
     Artifact,
     ArtifactEvent,
     ArtifactType,
-    ChatRequest,
     CodeArtifactData,
-    UIEvent,
 )
 from pydantic import BaseModel, Field
 
@@ -67,7 +64,8 @@ class UIEventData(BaseModel):
 
 ## ==== Workflow Events ====
 class ChatStartEvent(StartEvent):
-    chat_request: ChatRequest  # TODO: Can use chat messages
+    user_msg: str
+    chat_history: list[ChatMessage]
 
 
 class PlanEvent(Event):
@@ -86,6 +84,11 @@ class StreamEvent(Event):
     delta: str
 
 
+class UIEvent(Event):
+    type: str
+    data: dict
+
+
 class CodeArtifactWorkflow(Workflow):
     """
     A simple workflow that help generate/update the chat artifact (code, document)
@@ -98,20 +101,13 @@ class CodeArtifactWorkflow(Workflow):
 
     @step
     async def prepare_chat_history(self, ctx: Context, ev: ChatStartEvent) -> PlanEvent:
-        chat_messages = ev.chat_request.messages
-        user_msg = chat_messages[-1]
-        if not user_msg:
-            raise ValueError("Please send a message to start the workflow")
+        memory = Memory.from_defaults(chat_history=ev.chat_history)  # type: ignore
 
-        chat_history = [ev.to_llamaindex_message() for ev in ev.chat_request.messages]
-        chat_history.append(ChatMessage(role="user", content=user_msg))
-        memory = Memory.from_defaults(chat_history=chat_history)  # type: ignore
+        # last_artifact_content = get_last_artifact(ev.chat_request)
 
-        last_artifact_content = get_last_artifact(ev.chat_request)
-
-        await ctx.set("user_msg", user_msg.content)
+        await ctx.set("user_msg", ev.user_msg)
         await ctx.set("memory", memory)
-        await ctx.set("last_artifact_content", last_artifact_content)
+        await ctx.set("last_artifact_content", "")  # TODO:
 
         return PlanEvent()
 
@@ -129,7 +125,7 @@ class CodeArtifactWorkflow(Workflow):
                 data=UIEventData(
                     state="plan",
                     requirement=None,
-                ),
+                ).model_dump(),
             )
         )
 
@@ -192,7 +188,7 @@ class CodeArtifactWorkflow(Workflow):
                 data=UIEventData(
                     state="generate",
                     requirement=event.context,
-                ),
+                ).model_dump(),
             )
         )
 
@@ -293,7 +289,7 @@ class CodeArtifactWorkflow(Workflow):
                 type="ui_event",
                 data=UIEventData(
                     state="completed",
-                ),
+                ).model_dump(),
             )
         )
         response = ""

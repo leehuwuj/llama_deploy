@@ -11,7 +11,9 @@ from starlette.background import BackgroundTask
 
 from llama_deploy.apiserver.deployment_config_parser import DeploymentConfig
 from llama_deploy.apiserver.server import manager
+from llama_deploy.services import ChatUIService, VercelStreamResponse
 from llama_deploy.types import (
+    ChatRequest,
     DeploymentDefinition,
     EventDefinition,
     SessionDefinition,
@@ -414,3 +416,29 @@ async def proxy(
     except Exception as e:
         logger.error(f"Proxy error: {e}")
         raise HTTPException(status_code=502, detail="Proxy error")
+
+
+# Chat routers
+# Could be moved to a separate file/service
+@deployments_router.post("/{deployment_name}/chat")
+async def handle_chat(
+    deployment_name: str,
+    chat_request: ChatRequest,
+) -> StreamingResponse:
+    """
+    Handle a chat request by creating a new session and running a task then streaming the response.
+    """
+    task_definition = ChatUIService.to_task_definition(chat_request)
+    updated_task_definition = await create_deployment_task_nowait(
+        deployment_name, task_definition
+    )
+    # Get stream events
+    deployment = manager.get_deployment(deployment_name)
+    if deployment is None:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    session = await deployment.client.core.sessions.get(
+        updated_task_definition.session_id
+    )
+    response_generator = session.get_task_result_stream(updated_task_definition.task_id)
+    return VercelStreamResponse(response_generator)

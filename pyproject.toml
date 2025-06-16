@@ -17,7 +17,8 @@ dev = [
   "aiokafka>=0.11.0,<0.12",
   "kafka-python-ng>=2.2.2,<3",
   "pre-commit>=4.2.0",
-  "respx>=0.22.0"
+  "respx>=0.22.0",
+  "llama-index-server>=0.1.21"
 ]
 
 [project]

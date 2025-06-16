@@ -1,4 +1,4 @@
-from .apiserver import DeploymentDefinition, Status, StatusEnum
+from .apiserver import ChatRequest, DeploymentDefinition, Status, StatusEnum
 from .core import (
     CONTROL_PLANE_NAME,
     ActionTypes,
@@ -19,6 +19,7 @@ __all__ = [
     "CONTROL_PLANE_NAME",
     "ActionTypes",
     "ChatMessage",
+    "ChatRequest",
     "EventDefinition",
     "HumanResponse",
     "ServiceDefinition",
